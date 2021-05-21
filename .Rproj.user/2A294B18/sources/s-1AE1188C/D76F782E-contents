@@ -1,0 +1,181 @@
+library(tidyverse)
+library('randomForest') # classification algorithm
+
+
+
+train <- read.csv('train.csv', stringsAsFactors = F)
+test <- read.csv('test.csv', stringsAsFactors = F)
+
+
+#check use dim
+dim(train)
+dim(test)
+
+median(train$Age, na.rm = TRUE)
+median(test$Age, na.rm = TRUE)
+
+#the Survived is not I test.csv I want add it and put NA data
+test$Survived <- NA
+#na not availablie
+
+
+dim(train)
+dim(test)
+#ok good 
+
+
+#rbind fun to join two  data
+full<- rbind(train,test)
+
+418+891
+
+
+
+##clean missing
+
+#Embarked
+table(full$Embarked)
+
+
+
+full[full$Embarked=='',"Embarked"] <- 'S'
+table(full$Embarked)
+
+
+#Age 
+table(is.na(full$Age))
+age.median<- median(full$Age,na.rm = T)
+age.median 
+full[is.na(full$Age),"Age"]<- age.median
+table(is.na(full$Age))
+
+
+
+#Fare
+table(is.na(full$Fare))
+median(full$Fare,na.rm = T)
+fare.median<- median(full$Fare,na.rm = T)
+full[is.na(full$Fare),"Fare"]<- fare.median
+table(is.na(full$Fare))
+
+str(full)
+
+
+#categorical casting
+full$Pclass <- as.factor(full$Pclass)
+full$Sex <- as.factor(full$Sex)
+full$Embarked <- as.factor(full$Embarked)
+str(full)
+
+
+train$Survived <- as.factor(train$Survived)
+
+
+
+Survived.equation  <-" Survived ~ Pclass + Sex+ Age +SibSp +Parch + Fare +Embarked " 
+
+Survived.formula<- as.formula(Survived.equation)
+
+
+# Grab title from passenger names
+full$Title <- gsub('(.*, )|(\\..*)', '', full$Name)
+
+
+# Show title counts by sex
+table(full$Sex, full$Title)
+
+# Titles with very low cell counts to be combined to "rare" level
+rare_title <- c('Dona', 'Lady', 'the Countess','Capt', 'Col', 'Don',
+                'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer')
+
+
+
+
+
+# Also reassign mlle, ms, and mme accordingly
+full$Title[full$Title == 'Mlle']        <- 'Miss'
+full$Title[full$Title == 'Ms']          <- 'Miss'
+full$Title[full$Title == 'Mme']         <- 'Mrs'
+full$Title[full$Title %in% rare_title]  <- 'Rare Title'
+
+
+
+
+
+
+
+
+
+
+
+
+# Create the column child, and indicate whether child or adult
+full$Child[full$Age < 18] <- 'Child'
+full$Child[full$Age >= 18] <- 'Adult'
+# Show counts
+table(full$Child, full$Survived)
+# Adding Mother variable
+full$Mother <- 'Not Mother'
+full$Mother[full$Sex == 'female' & full$Parch > 0 & full$Age > 18 & full$Title != 'Miss'] <- 'Mother'
+# Show counts
+table(full$Mother, full$Survived)
+# Finish by factorizing our two new factor variables
+full$Child  <- factor(full$Child)
+full$Mother <- factor(full$Mother)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#	Prediction
+train <- full[1:891,]
+test <- full[892:1309,]
+
+# Set a random seed
+set.seed(754)
+
+# Build the model (note: not all possible variables are used)
+rf_model <- randomForest(factor(Survived) ~ Pclass + Sex + Age + SibSp + Parch +
+                           Fare + Embarked + Title +
+                           Child + Mother,
+                         data = train)
+
+
+
+importance    <- importance(rf_model)
+varImportance <- data.frame(Variables = row.names(importance),
+                            Importance = round(importance[ ,'MeanDecreaseGini'],2))
+
+
+
+# Create a rank variable based on importance
+rankImportance <- varImportance %>%
+  mutate(Rank = paste0('#',dense_rank(desc(Importance))))
+
+
+# Predict using the test set
+prediction <- predict(rf_model, test)
+
+# Save the solution to a dataframe with two columns: PassengerId and Survived (prediction)
+solution <- data.frame(PassengerID = test$PassengerId, Survived = prediction)
+
+
+# Write the solution to file
+write.csv(solution, file = 'mod_Solution.csv', row.names = F)
+
+#thanks
+
